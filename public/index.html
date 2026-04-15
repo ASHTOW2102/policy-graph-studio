@@ -117,7 +117,6 @@
                 id="question"
                 rows="6"
                 placeholder="Can a contractor access confidential policy documents from a personal laptop?"
-                required
               ></textarea>
             </label>
 
@@ -223,7 +222,7 @@
               </div>
 
               <pre id="finalAnswer" class="answer-box placeholder">Ask a question to retrieve an answer.</pre>
-              <audio id="ttsAudio" class="audio-player hidden" controls></audio>
+              <audio id="ttsAudio" class="audio-player hidden" controls playsinline preload="metadata"></audio>
               <pre id="ttsStatus" class="mono-card subtle placeholder">Audio status will appear here.</pre>
             </section>
 

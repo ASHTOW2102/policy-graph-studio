@@ -44,6 +44,34 @@ let recordedAudioUrl = "";
 let ttsAudioUrl = "";
 let uploadedAudioFile = null;
 
+function getSupportedRecordingMimeType() {
+  if (typeof MediaRecorder === "undefined") {
+    return null;
+  }
+
+  if (typeof MediaRecorder.isTypeSupported !== "function") {
+    return "";
+  }
+
+  const candidates = [
+    "audio/webm;codecs=opus",
+    "audio/webm",
+    "audio/mp4",
+    "audio/mpeg",
+    "audio/ogg;codecs=opus",
+    "audio/ogg",
+    "audio/wav",
+  ];
+
+  for (const candidate of candidates) {
+    if (MediaRecorder.isTypeSupported(candidate)) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
 function setActiveScreen(target) {
   const adminActive = target === "admin";
   adminTab.classList.toggle("active", adminActive);
@@ -225,6 +253,8 @@ function setSelectedAudio(fileOrBlob, fileName, mimeType) {
 }
 
 function setTtsAudio(base64, contentType) {
+  ttsAudio.pause();
+  ttsAudio.removeAttribute("src");
   if (ttsAudioUrl) {
     URL.revokeObjectURL(ttsAudioUrl);
     ttsAudioUrl = "";
@@ -237,6 +267,7 @@ function setTtsAudio(base64, contentType) {
   const blob = new Blob([bytes], { type: contentType || "audio/wav" });
   ttsAudioUrl = URL.createObjectURL(blob);
   ttsAudio.src = ttsAudioUrl;
+  ttsAudio.load();
   ttsAudio.classList.remove("hidden");
 }
 
@@ -293,30 +324,41 @@ async function refreshHealth() {
 
 recordButton.addEventListener("click", async () => {
   try {
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== "function" ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      throw new Error("Live recording is not supported on this browser. Use audio upload instead.");
+    }
+
     uploadedAudioFile = null;
     audioUploadInput.value = "";
     if (recordedAudioUrl) {
       URL.revokeObjectURL(recordedAudioUrl);
-    recordedAudioUrl = "";
+      recordedAudioUrl = "";
     }
     recordedBlob = null;
     recordedAudio.removeAttribute("src");
     recordedAudio.classList.add("hidden");
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const preferredMimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : "audio/webm";
-    recordedMimeType = preferredMimeType;
+    const preferredMimeType = getSupportedRecordingMimeType();
+    recordedMimeType = preferredMimeType || "audio/webm";
     const chunks = [];
-    mediaRecorder = new MediaRecorder(stream, { mimeType: preferredMimeType });
+    mediaRecorder = preferredMimeType
+      ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+      : new MediaRecorder(stream);
     mediaRecorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
         chunks.push(event.data);
       }
     };
     mediaRecorder.onstop = () => {
-      recordedBlob = new Blob(chunks, { type: recordedMimeType });
-      setSelectedAudio(recordedBlob, "recorded audio", recordedMimeType);
+      const mimeType = mediaRecorder.mimeType || recordedMimeType || "audio/webm";
+      recordedBlob = new Blob(chunks, { type: mimeType });
+      recordedMimeType = mimeType;
+      setSelectedAudio(recordedBlob, "recorded audio", mimeType);
       stream.getTracks().forEach((track) => track.stop());
       setRecordingState(false, "Recorded");
     };
@@ -439,7 +481,7 @@ queryForm.addEventListener("submit", async (event) => {
   }
 
   askButton.disabled = true;
-  askButton.textContent = hasAudio ? "Transcribing + Querying..." : "Querying...";
+  askButton.textContent = "Querying...";
   setMonoBox(finalAnswer, "Generating answer...", true);
   renderContext([]);
   renderAgents([]);
@@ -517,8 +559,15 @@ speakButton.addEventListener("click", async () => {
     }
 
     setTtsAudio(data.audioBase64, data.contentType);
-    setMonoBox(ttsStatus, `Audio ready. Voice: ${data.speaker} | Language: ${data.targetLanguageCode}`);
-    await ttsAudio.play().catch(() => {});
+    try {
+      await ttsAudio.play();
+      setMonoBox(ttsStatus, `Playing now. Voice: ${data.speaker} | Language: ${data.targetLanguageCode}`);
+    } catch {
+      setMonoBox(
+        ttsStatus,
+        `Audio ready. Voice: ${data.speaker} | Language: ${data.targetLanguageCode}\nTap play on the audio bar below on mobile browsers.`,
+      );
+    }
   } catch (error) {
     setMonoBox(ttsStatus, error.message || "Speech synthesis failed.", true);
   } finally {
