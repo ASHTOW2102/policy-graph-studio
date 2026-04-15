@@ -13,7 +13,11 @@ const PUBLIC_DIR = path.join(__dirname, "public");
 const DATA_DIR = path.join(__dirname, "data");
 const STORAGE_DIR = path.join(DATA_DIR, "storage");
 const TMP_DIR = path.join(DATA_DIR, "tmp");
-const GRAPH_PATH = path.join(DATA_DIR, "knowledge-graph.json");
+const KB_INDEX_PATH = path.join(DATA_DIR, "rag-index.json");
+const FAISS_INDEX_PATH = path.join(DATA_DIR, "rag.index");
+const LEGACY_GRAPH_PATH = path.join(DATA_DIR, "knowledge-graph.json");
+const FAISS_SCRIPT_PATH = path.join(__dirname, "scripts", "faiss_rag.py");
+const PYTHON_BIN = process.env.PYTHON_BIN || "C:\\Users\\vmadmin\\AppData\\Local\\Programs\\Python\\Python312\\python.exe";
 const SARVAM_API_URL = "https://api.sarvam.ai/v1/chat/completions";
 const SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text";
 const SARVAM_TTS_URL = "https://api.sarvam.ai/text-to-speech";
@@ -256,6 +260,27 @@ function normalizeWhitespace(text) {
 function normalizeResponseLanguage(value) {
   const language = normalizeWhitespace(value || "");
   return language || "Same as the user question";
+}
+
+function createDocumentSummary(document, chunkCount, keywordPreview) {
+  return {
+    id: document.id,
+    name: document.name,
+    relativePath: document.relativePath,
+    extension: document.extension,
+    sourcePath: document.sourcePath,
+    chunkCount,
+    keywordPreview,
+  };
+}
+
+function runPythonJson(args) {
+  const output = execFileSync(PYTHON_BIN, [FAISS_SCRIPT_PATH, ...args], {
+    cwd: __dirname,
+    stdio: ["ignore", "pipe", "pipe"],
+    encoding: "utf8",
+  });
+  return JSON.parse(output);
 }
 
 function stripThinkBlocks(text) {
@@ -637,144 +662,174 @@ function loadDocumentsFromUploads(sources) {
   return { docs, warnings };
 }
 
-function createGraph(documents) {
-  const nodes = [];
-  const edges = [];
-  const documentSummaries = [];
-
-  for (const document of documents) {
-    const documentNodeId = `document:${document.id}`;
-    const documentKeywords = collectKeywordScores(document.text);
-    nodes.push({
-      id: documentNodeId,
-      type: "document",
-      label: document.name,
-      sourcePath: document.sourcePath,
-      relativePath: document.relativePath,
-      extension: document.extension,
-      text: document.text.slice(0, 5000),
-      keywords: documentKeywords,
-    });
-
-    const sections = splitIntoSections(document.text).slice(0, 24);
-    const sectionSummaries = [];
-    for (const section of sections) {
-      const sectionNodeId = `section:${document.id}:${slugify(section.heading)}`;
-      const sectionKeywords = collectKeywordScores(section.text);
-      nodes.push({
-        id: sectionNodeId,
-        type: "section",
-        label: section.heading,
-        documentId: documentNodeId,
-        documentName: document.name,
-        text: section.text.slice(0, 4000),
-        keywords: sectionKeywords,
-      });
-      edges.push({
-        id: uniqueId("edge"),
-        type: "contains",
-        from: documentNodeId,
-        to: sectionNodeId,
-      });
-
-      const statements = splitIntoStatements(section.text);
-      const statementIds = [];
-      for (let index = 0; index < statements.length; index += 1) {
-        const statement = statements[index];
-        const statementNodeId = `statement:${document.id}:${slugify(section.heading)}:${index + 1}`;
-        nodes.push({
-          id: statementNodeId,
-          type: "statement",
-          label: `Statement ${index + 1}`,
-          documentId: documentNodeId,
-          documentName: document.name,
-          sectionId: sectionNodeId,
-          sectionHeading: section.heading,
-          text: statement,
-          keywords: collectKeywordScores(statement),
-        });
-        edges.push({
-          id: uniqueId("edge"),
-          type: "contains",
-          from: sectionNodeId,
-          to: statementNodeId,
-        });
-        statementIds.push(statementNodeId);
-      }
-
-      for (const keyword of sectionKeywords.slice(0, 8)) {
-        const keywordNodeId = `keyword:${keyword.value}`;
-        if (!nodes.find((node) => node.id === keywordNodeId)) {
-          nodes.push({
-            id: keywordNodeId,
-            type: "keyword",
-            label: keyword.value,
-            text: keyword.value,
-          });
-        }
-        edges.push({
-          id: uniqueId("edge"),
-          type: "mentions",
-          from: sectionNodeId,
-          to: keywordNodeId,
-          weight: keyword.score,
-        });
-      }
-
-      sectionSummaries.push({
-        id: sectionNodeId,
-        heading: section.heading,
-        statementIds,
-      });
-    }
-
-    documentSummaries.push({
-      id: documentNodeId,
-      name: document.name,
-      relativePath: document.relativePath,
-      extension: document.extension,
-      keywordPreview: documentKeywords.map((item) => item.value),
-      sectionCount: sections.length,
-      sourcePath: document.sourcePath,
-      sections: sectionSummaries,
-    });
+function chunkText(text, options = {}) {
+  const maxLength = Number(options.maxLength || 900);
+  const overlap = Number(options.overlap || 180);
+  const normalized = normalizeWhitespace(text);
+  if (!normalized) {
+    return [];
   }
 
+  const paragraphs = normalized
+    .split(/\n{2,}/g)
+    .map((part) => normalizeWhitespace(part))
+    .filter(Boolean);
+  const segments = paragraphs.length ? paragraphs : [normalized];
+  const chunks = [];
+  let buffer = "";
+
+  for (const segment of segments) {
+    const next = buffer ? `${buffer}\n\n${segment}` : segment;
+    if (next.length <= maxLength) {
+      buffer = next;
+      continue;
+    }
+
+    if (buffer) {
+      chunks.push(buffer);
+    }
+
+    if (segment.length <= maxLength) {
+      buffer = segment;
+      continue;
+    }
+
+    let start = 0;
+    while (start < segment.length) {
+      let end = Math.min(start + maxLength, segment.length);
+      if (end < segment.length) {
+        const boundary = segment.lastIndexOf(" ", end);
+        if (boundary > start + Math.floor(maxLength * 0.55)) {
+          end = boundary;
+        }
+      }
+      const piece = normalizeWhitespace(segment.slice(start, end));
+      if (piece) {
+        chunks.push(piece);
+      }
+      if (end >= segment.length) {
+        break;
+      }
+      start = Math.max(end - overlap, start + 1);
+    }
+    buffer = "";
+  }
+
+  if (buffer) {
+    chunks.push(buffer);
+  }
+
+  return chunks.filter(Boolean);
+}
+
+function createRagIndex(documents) {
+  const chunks = [];
+  const documentSummaries = [];
+  let totalChunkTerms = 0;
+
+  for (const document of documents) {
+    const documentKeywords = collectKeywordScores(document.text).map((item) => item.value);
+    const sections = splitIntoSections(document.text).slice(0, 64);
+    let documentChunkCount = 0;
+
+    for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
+      const section = sections[sectionIndex];
+      const sectionChunks = chunkText(section.text, { maxLength: 1100, overlap: 220 });
+
+      for (let chunkIndex = 0; chunkIndex < sectionChunks.length; chunkIndex += 1) {
+        const chunkTextValue = sectionChunks[chunkIndex];
+        const tokens = tokenize(`${section.heading} ${chunkTextValue}`);
+        if (!tokens.length) {
+          continue;
+        }
+
+        const chunkId = `chunk:${document.id}:${sectionIndex + 1}:${chunkIndex + 1}`;
+        chunks.push({
+          id: chunkId,
+          type: "chunk",
+          documentId: document.id,
+          documentName: document.name,
+          relativePath: document.relativePath,
+          sourcePath: document.sourcePath,
+          extension: document.extension,
+          sectionHeading: section.heading,
+          chunkIndex: chunkIndex + 1,
+          text: chunkTextValue,
+          tokenCount: tokens.length,
+          keywordPreview: collectKeywordScores(chunkTextValue).map((item) => item.value),
+        });
+        totalChunkTerms += tokens.length;
+        documentChunkCount += 1;
+      }
+    }
+
+    documentSummaries.push(createDocumentSummary(document, documentChunkCount, documentKeywords));
+  }
+
+  const averageChunkLength = chunks.length ? totalChunkTerms / chunks.length : 0;
+
   return {
-    version: 1,
+    version: 2,
+    type: "faiss-local-rag",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     stats: {
       documentCount: documentSummaries.length,
-      nodeCount: nodes.length,
-      edgeCount: edges.length,
+      chunkCount: chunks.length,
+      averageChunkLength: Number(averageChunkLength.toFixed(2)),
     },
     documents: documentSummaries,
-    nodes,
-    edges,
+    retrieval: {
+      algorithm: "faiss hashed-vector similarity",
+      embeddingModel: "local-hash-384",
+      totalChunks: chunks.length,
+      averageChunkLength,
+      dimension: 384,
+      indexPath: FAISS_INDEX_PATH,
+    },
+    chunks,
   };
 }
 
-function saveGraph(graph) {
-  graph.updatedAt = new Date().toISOString();
-  graph.stats = {
-    documentCount: graph.documents.length,
-    nodeCount: graph.nodes.length,
-    edgeCount: graph.edges.length,
+function saveKnowledgeBase(index) {
+  index.updatedAt = new Date().toISOString();
+  index.stats = {
+    documentCount: index.documents.length,
+    chunkCount: index.chunks.length,
+    averageChunkLength: Number(
+      (
+        index.chunks.reduce((sum, chunk) => sum + Number(chunk.tokenCount || 0), 0) /
+        Math.max(index.chunks.length, 1)
+      ).toFixed(2),
+    ),
   };
-  fs.writeFileSync(GRAPH_PATH, JSON.stringify(graph, null, 2));
+  fs.writeFileSync(KB_INDEX_PATH, JSON.stringify(index, null, 2));
+  runPythonJson(["build", "--metadata", KB_INDEX_PATH, "--index", FAISS_INDEX_PATH]);
+  if (fs.existsSync(LEGACY_GRAPH_PATH)) {
+    fs.unlinkSync(LEGACY_GRAPH_PATH);
+  }
 }
 
-function loadGraph() {
-  if (!fs.existsSync(GRAPH_PATH)) {
+function loadKnowledgeBase() {
+  if (!fs.existsSync(KB_INDEX_PATH)) {
     return null;
   }
-  return JSON.parse(fs.readFileSync(GRAPH_PATH, "utf8"));
+  const knowledgeBase = JSON.parse(fs.readFileSync(KB_INDEX_PATH, "utf8"));
+  if (!fs.existsSync(FAISS_INDEX_PATH)) {
+    runPythonJson(["build", "--metadata", KB_INDEX_PATH, "--index", FAISS_INDEX_PATH]);
+  }
+  return knowledgeBase;
 }
 
 function clearKnowledgeBase() {
-  if (fs.existsSync(GRAPH_PATH)) {
-    fs.unlinkSync(GRAPH_PATH);
+  if (fs.existsSync(KB_INDEX_PATH)) {
+    fs.unlinkSync(KB_INDEX_PATH);
+  }
+  if (fs.existsSync(FAISS_INDEX_PATH)) {
+    fs.unlinkSync(FAISS_INDEX_PATH);
+  }
+  if (fs.existsSync(LEGACY_GRAPH_PATH)) {
+    fs.unlinkSync(LEGACY_GRAPH_PATH);
   }
   clearDirectory(STORAGE_DIR);
   clearDirectory(TMP_DIR);
@@ -782,54 +837,46 @@ function clearKnowledgeBase() {
   ensureDir(TMP_DIR);
 }
 
-function scoreNodeAgainstQuestion(node, questionTokens) {
-  if (!node.text) {
-    return 0;
-  }
-  const nodeTokens = tokenize(`${node.label || ""} ${node.text}`);
-  if (!nodeTokens.length) {
-    return 0;
-  }
-  const uniqueNodeTokens = new Set(nodeTokens);
-  let score = 0;
-  for (const token of questionTokens) {
-    if (uniqueNodeTokens.has(token)) {
-      score += 3;
-    }
-  }
-  if (node.type === "statement") {
-    score += 2;
-  }
-  if (node.type === "section") {
-    score += 1;
-  }
-  return score;
-}
-
-function retrieveRelevantContext(graph, question, topK = 8) {
-  const questionTokens = tokenize(question);
-  const ranked = graph.nodes
-    .filter((node) => node.type === "statement" || node.type === "section")
-    .map((node) => ({ node, score: scoreNodeAgainstQuestion(node, questionTokens) }))
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score || a.node.id.localeCompare(b.node.id))
-    .slice(0, topK);
-
-  const contextItems = ranked.map((entry) => ({
-    id: entry.node.id,
-    type: entry.node.type,
-    score: entry.score,
-    documentName: entry.node.documentName,
-    sectionHeading: entry.node.sectionHeading || entry.node.label,
-    text: entry.node.text,
-  }));
+function retrieveRelevantContext(index, question, topK = 8) {
+  const chunks = Array.isArray(index?.chunks) ? index.chunks : [];
+  const chunkMap = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+  const searchResult = runPythonJson([
+    "search",
+    "--metadata",
+    KB_INDEX_PATH,
+    "--index",
+    FAISS_INDEX_PATH,
+    "--query",
+    question,
+    "--top-k",
+    String(topK),
+  ]);
+  const matches = Array.isArray(searchResult.matches) ? searchResult.matches : [];
+  const contextItems = matches
+    .map((match) => {
+      const chunk = chunkMap.get(match.id);
+      if (!chunk) {
+        return null;
+      }
+      return {
+        id: chunk.id,
+        type: "chunk",
+        score: Number(Number(match.score || 0).toFixed(3)),
+        documentName: chunk.documentName,
+        sectionHeading: chunk.sectionHeading || `Chunk ${chunk.chunkIndex}`,
+        text: chunk.text,
+        chunkIndex: chunk.chunkIndex,
+        keywords: chunk.keywordPreview || [],
+      };
+    })
+    .filter(Boolean);
 
   return {
     contextItems,
     contextBlock: contextItems
       .map(
-        (item, index) =>
-          `[${index + 1}] ${item.documentName || "Unknown document"} | ${item.id} | ${item.sectionHeading}\n${item.text}`,
+        (item, indexValue) =>
+          `[${indexValue + 1}] ${item.documentName || "Unknown document"} | ${item.id} | ${item.sectionHeading}\n${item.text}`,
       )
       .join("\n\n"),
   };
@@ -1088,7 +1135,7 @@ function buildFallbackAnswer(question, retrieval, responseLanguage) {
   }
   lines.push("");
   lines.push(
-    `Based on the current knowledge graph, the answer should be grounded in the points above. Configure SARVAM_API_KEY to get a synthesized final response from the policy agents.`,
+    `Based on the current local RAG retrieval, the answer should be grounded in the chunks above. Configure SARVAM_API_KEY to get a synthesized final response from the policy agents.`,
   );
 
   return {
@@ -1098,26 +1145,28 @@ function buildFallbackAnswer(question, retrieval, responseLanguage) {
         id: "local_retriever",
         name: "Local Retriever",
         model: "heuristic",
-        content: retrieval.contextBlock || "No relevant graph nodes found.",
+        content: retrieval.contextBlock || "No relevant chunks found.",
       },
     ],
   };
 }
 
-function summarizeGraph(graph) {
+function summarizeKnowledgeBase(index) {
   return {
-    exists: Boolean(graph),
-    path: GRAPH_PATH,
-    stats: graph ? graph.stats : { documentCount: 0, nodeCount: 0, edgeCount: 0 },
-    documents: graph ? graph.documents.map((doc) => ({
+    exists: Boolean(index),
+    path: KB_INDEX_PATH,
+    faissIndexPath: FAISS_INDEX_PATH,
+    type: index?.type || "faiss-local-rag",
+    stats: index ? index.stats : { documentCount: 0, chunkCount: 0, averageChunkLength: 0 },
+    documents: index ? index.documents.map((doc) => ({
       id: doc.id,
       name: doc.name,
       relativePath: doc.relativePath,
       extension: doc.extension,
-      sectionCount: doc.sectionCount,
+      chunkCount: doc.chunkCount,
       keywordPreview: doc.keywordPreview,
     })) : [],
-    updatedAt: graph ? graph.updatedAt : null,
+    updatedAt: index ? index.updatedAt : null,
   };
 }
 
@@ -1125,27 +1174,27 @@ async function handleApi(req, res) {
   const pathname = new URL(req.url, `http://${req.headers.host}`).pathname;
 
   if (req.method === "GET" && pathname === "/api/health") {
-    const graph = loadGraph();
+    const knowledgeBase = loadKnowledgeBase();
     sendJson(res, 200, {
       ok: true,
       configured: Boolean(process.env.SARVAM_API_KEY),
-      knowledgeBase: summarizeGraph(graph),
+      knowledgeBase: summarizeKnowledgeBase(knowledgeBase),
     });
     return;
   }
 
   if (req.method === "GET" && pathname === "/api/knowledge-base") {
-    sendJson(res, 200, summarizeGraph(loadGraph()));
+    sendJson(res, 200, summarizeKnowledgeBase(loadKnowledgeBase()));
     return;
   }
 
   if (req.method === "GET" && pathname === "/api/knowledge-graph") {
-    const graph = loadGraph();
-    if (!graph) {
-      sendJson(res, 404, { error: "Knowledge graph not found." });
+    const knowledgeBase = loadKnowledgeBase();
+    if (!knowledgeBase) {
+      sendJson(res, 404, { error: "Knowledge base not found." });
       return;
     }
-    sendJson(res, 200, graph);
+    sendJson(res, 200, knowledgeBase);
     return;
   }
 
@@ -1165,8 +1214,8 @@ async function handleApi(req, res) {
         return;
       }
 
-      const graph = createGraph(documents);
-      saveGraph(graph);
+      const knowledgeBase = createRagIndex(documents);
+      saveKnowledgeBase(knowledgeBase);
 
       sendJson(res, 200, {
         ok: true,
@@ -1178,7 +1227,7 @@ async function handleApi(req, res) {
           extension: doc.extension,
           sourcePath: doc.sourcePath,
         })),
-        knowledgeBase: summarizeGraph(graph),
+        knowledgeBase: summarizeKnowledgeBase(knowledgeBase),
       });
     } catch (error) {
       sendJson(res, 500, { error: error.message });
@@ -1191,7 +1240,7 @@ async function handleApi(req, res) {
       clearKnowledgeBase();
       sendJson(res, 200, {
         ok: true,
-        knowledgeBase: summarizeGraph(loadGraph()),
+        knowledgeBase: summarizeKnowledgeBase(loadKnowledgeBase()),
       });
     } catch (error) {
       sendJson(res, 500, { error: error.message });
@@ -1209,13 +1258,13 @@ async function handleApi(req, res) {
         return;
       }
 
-      const graph = loadGraph();
-      if (!graph) {
-        sendJson(res, 400, { error: "No knowledge base found. Build the knowledge graph from the Admin screen first." });
+      const knowledgeBase = loadKnowledgeBase();
+      if (!knowledgeBase) {
+        sendJson(res, 400, { error: "No knowledge base found. Build the local RAG index from the Admin screen first." });
         return;
       }
 
-      const retrieval = retrieveRelevantContext(graph, question, Number(body.topK || 8));
+      const retrieval = retrieveRelevantContext(knowledgeBase, question, Number(body.topK || 8));
       let answer;
       let warning = null;
       if (process.env.SARVAM_API_KEY) {
@@ -1223,7 +1272,7 @@ async function handleApi(req, res) {
           answer = await answerWithAgents(question, retrieval, responseLanguage);
         } catch (error) {
           answer = buildFallbackAnswer(question, retrieval, responseLanguage);
-          warning = `Sarvam agent flow failed. Returned a local graph-based summary instead. Detail: ${error.message}`;
+          warning = `Sarvam agent flow failed. Returned a local RAG summary instead. Detail: ${error.message}`;
         }
       } else {
         answer = buildFallbackAnswer(question, retrieval, responseLanguage);
@@ -1235,7 +1284,7 @@ async function handleApi(req, res) {
         finalAnswer: answer.finalAnswer,
         agents: answer.agents,
         contextItems: retrieval.contextItems,
-        knowledgeBase: summarizeGraph(graph),
+        knowledgeBase: summarizeKnowledgeBase(knowledgeBase),
         warning,
       });
     } catch (error) {

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Policy Graph Studio</title>
+    <title>Policy RAG Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -22,11 +22,11 @@
     <main class="shell">
       <section class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">Policy Graph Studio</p>
-          <h1>Simple AI answers from your policy knowledge base.</h1>
+          <p class="eyebrow">Policy RAG Studio</p>
+          <h1>Simple AI answers from your policy documents.</h1>
           <p class="hero-text">
-            Upload files on the admin side. Ask questions, upload audio, or transcribe speech on
-            the user side.
+            Upload files on the admin side. The app builds a free local RAG index, then the user
+            side retrieves the best chunks and asks Sarvam to answer from them.
           </p>
         </div>
 
@@ -65,7 +65,7 @@
             </label>
 
             <div class="action-row">
-              <button id="buildButton" class="button button-primary" type="submit">Build Graph</button>
+              <button id="buildButton" class="button button-primary" type="submit">Build RAG Index</button>
               <button id="refreshKbButton" class="button button-secondary" type="button">Refresh</button>
               <button id="clearKbButton" class="button button-secondary" type="button">Clear KB</button>
             </div>
@@ -87,7 +87,7 @@
                 <h2>Loaded files</h2>
               </div>
               <div id="documentList" class="list-grid empty-state">
-                Build the graph to see ingested documents here.
+                Build the RAG index to see ingested documents here.
               </div>
             </section>
 
@@ -107,7 +107,7 @@
           <form id="queryForm" class="panel form-panel">
             <div class="panel-head">
               <p class="panel-kicker">Ask</p>
-              <h2>Query the policy graph</h2>
+              <h2>Query the policy knowledge base</h2>
               <p class="panel-text">Type a question or upload an audio recording for transcription.</p>
             </div>
 
@@ -138,14 +138,14 @@
               <div class="subpanel-head">
                 <div>
                   <p class="subpanel-title">Speech to text</p>
-                  <p class="subpanel-text">Upload or record audio, then transcribe it.</p>
+                  <p class="subpanel-text">Upload or record audio, then query the database directly.</p>
                 </div>
                 <span id="recordingBadge" class="status-chip">Idle</span>
               </div>
 
               <label class="field">
                 <span>Audio file</span>
-                <input id="audioUploadInput" type="file" accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg" />
+                <input id="audioUploadInput" type="file" accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg" capture />
               </label>
 
               <div class="inline-grid">
@@ -231,7 +231,7 @@
                 <p class="panel-kicker">Sources</p>
                 <h2>Relevant context</h2>
               </div>
-              <div id="contextList" class="list-grid empty-state">Relevant graph nodes will appear here.</div>
+              <div id="contextList" class="list-grid empty-state">Relevant RAG chunks will appear here.</div>
             </section>
 
             <details class="panel debug-panel">

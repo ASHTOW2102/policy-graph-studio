@@ -42,6 +42,7 @@ let recordedBlob = null;
 let recordedMimeType = "audio/webm";
 let recordedAudioUrl = "";
 let ttsAudioUrl = "";
+let lastTtsRequestKey = "";
 let uploadedAudioFile = null;
 
 function getSupportedRecordingMimeType() {
@@ -72,6 +73,15 @@ function getSupportedRecordingMimeType() {
   return "";
 }
 
+function isLiveRecordingSupported() {
+  return Boolean(
+    typeof navigator !== "undefined" &&
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function" &&
+      typeof MediaRecorder !== "undefined",
+  );
+}
+
 function setActiveScreen(target) {
   const adminActive = target === "admin";
   adminTab.classList.toggle("active", adminActive);
@@ -99,8 +109,8 @@ function renderStats(stats) {
   kbStats.innerHTML = "";
   const items = [
     { label: "Documents", value: stats.documentCount || 0 },
-    { label: "Nodes", value: stats.nodeCount || 0 },
-    { label: "Edges", value: stats.edgeCount || 0 },
+    { label: "Chunks", value: stats.chunkCount || 0 },
+    { label: "Avg Terms", value: stats.averageChunkLength || 0 },
   ];
   for (const item of items) {
     const card = document.createElement("article");
@@ -129,7 +139,7 @@ function renderDocuments(documents) {
   for (const doc of documents) {
     const body = [
       `${doc.relativePath || doc.name}`,
-      `${doc.sectionCount || 0} sections`,
+      `${doc.chunkCount || 0} chunks`,
       `${(doc.keywordPreview || []).slice(0, 6).join(", ") || "No keywords"}`,
     ].join("\n");
     documentList.appendChild(createItemCard(doc.name, doc.id, body));
@@ -254,6 +264,11 @@ function setSelectedAudio(fileOrBlob, fileName, mimeType) {
 
 function setTtsAudio(base64, contentType) {
   ttsAudio.pause();
+  ttsAudio.currentTime = 0;
+  ttsAudio.muted = false;
+  ttsAudio.volume = 1;
+  ttsAudio.controls = true;
+  ttsAudio.setAttribute("playsinline", "true");
   ttsAudio.removeAttribute("src");
   if (ttsAudioUrl) {
     URL.revokeObjectURL(ttsAudioUrl);
@@ -269,6 +284,19 @@ function setTtsAudio(base64, contentType) {
   ttsAudio.src = ttsAudioUrl;
   ttsAudio.load();
   ttsAudio.classList.remove("hidden");
+  ttsAudio.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function resetTtsAudioState() {
+  ttsAudio.pause();
+  ttsAudio.currentTime = 0;
+  ttsAudio.removeAttribute("src");
+  if (ttsAudioUrl) {
+    URL.revokeObjectURL(ttsAudioUrl);
+    ttsAudioUrl = "";
+  }
+  lastTtsRequestKey = "";
+  ttsAudio.classList.add("hidden");
 }
 
 async function collectUploadSources() {
@@ -324,12 +352,7 @@ async function refreshHealth() {
 
 recordButton.addEventListener("click", async () => {
   try {
-    if (
-      typeof navigator === "undefined" ||
-      !navigator.mediaDevices ||
-      typeof navigator.mediaDevices.getUserMedia !== "function" ||
-      typeof MediaRecorder === "undefined"
-    ) {
+    if (!isLiveRecordingSupported()) {
       throw new Error("Live recording is not supported on this browser. Use audio upload instead.");
     }
 
@@ -393,7 +416,7 @@ adminForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   buildButton.disabled = true;
   buildButton.textContent = "Building...";
-  setMonoBox(ingestLog, "Building knowledge graph...", true);
+  setMonoBox(ingestLog, "Building local RAG index...", true);
 
   try {
     const sources = await collectUploadSources();
@@ -436,7 +459,7 @@ adminForm.addEventListener("submit", async (event) => {
     setMonoBox(ingestLog, error.message || "Ingestion failed.", true);
   } finally {
     buildButton.disabled = false;
-    buildButton.textContent = "Build Knowledge Graph";
+    buildButton.textContent = "Build RAG Index";
   }
 });
 
@@ -534,12 +557,38 @@ speakButton.addEventListener("click", async () => {
     setMonoBox(ttsStatus, "Run a query first so there is an answer to synthesize.", true);
     return;
   }
+  const currentTtsRequestKey = JSON.stringify({
+    text: answerText,
+    speaker: ttsSpeaker.value,
+    language: ttsLanguage.value,
+    pace: Number(ttsPace.value || 1),
+  });
 
   speakButton.disabled = true;
   speakButton.textContent = "Speaking...";
   setMonoBox(ttsStatus, "Generating speech with Sarvam text to speech...", true);
 
   try {
+    ttsAudio.pause();
+    ttsAudio.currentTime = 0;
+    if (
+      ttsAudioUrl &&
+      ttsAudio.src &&
+      !ttsAudio.classList.contains("hidden") &&
+      lastTtsRequestKey === currentTtsRequestKey
+    ) {
+      ttsAudio.muted = false;
+      ttsAudio.volume = 1;
+      ttsAudio.currentTime = 0;
+      try {
+        await ttsAudio.play();
+        setMonoBox(ttsStatus, "Playing current audio clip.");
+        return;
+      } catch {
+        setMonoBox(ttsStatus, "Tap play on the audio bar below to start the current clip.", true);
+      }
+    }
+
     const response = await fetch("/api/text-to-speech", {
       method: "POST",
       headers: {
@@ -559,13 +608,14 @@ speakButton.addEventListener("click", async () => {
     }
 
     setTtsAudio(data.audioBase64, data.contentType);
+    lastTtsRequestKey = currentTtsRequestKey;
     try {
       await ttsAudio.play();
       setMonoBox(ttsStatus, `Playing now. Voice: ${data.speaker} | Language: ${data.targetLanguageCode}`);
     } catch {
       setMonoBox(
         ttsStatus,
-        `Audio ready. Voice: ${data.speaker} | Language: ${data.targetLanguageCode}\nTap play on the audio bar below on mobile browsers.`,
+        `Audio ready. Voice: ${data.speaker} | Language: ${data.targetLanguageCode}\nTap the visible play button on the audio bar below.`,
       );
     }
   } catch (error) {
@@ -579,5 +629,22 @@ speakButton.addEventListener("click", async () => {
 renderContext([]);
 renderAgents([]);
 setRecordingState(false, "Idle");
+ttsAudio.addEventListener("play", () => {
+  ttsAudio.muted = false;
+  ttsAudio.volume = 1;
+});
+ttsSpeaker.addEventListener("change", resetTtsAudioState);
+ttsLanguage.addEventListener("change", resetTtsAudioState);
+ttsPace.addEventListener("input", resetTtsAudioState);
+if (!isLiveRecordingSupported()) {
+  recordButton.disabled = true;
+  stopButton.disabled = true;
+  setRecordingState(false, "Upload on phone");
+  setMonoBox(
+    transcriptBox,
+    "Live recording is not supported on this browser. Use Upload Audio to record from your phone and then tap Query Database.",
+    true,
+  );
+}
 refreshHealth();
 refreshKnowledgeBase();

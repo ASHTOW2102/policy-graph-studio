@@ -1,7 +1,10 @@
 .env
 data/knowledge-graph.json
+data/rag-index.json
+data/rag.index
 data/storage/
 data/tmp/
+scripts/__pycache__/
 server*.log
 server*.err.log
 cloudflared*.log
