@@ -1,0 +1,6 @@
+.env
+data/knowledge-graph.json
+data/storage/
+data/tmp/
+server*.log
+server*.err.log

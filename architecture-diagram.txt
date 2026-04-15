@@ -1,0 +1,33 @@
+title Policy Graph Studio
+direction right
+
+Admin [shape: square, icon: user, color: lightblue]
+User [shape: square, icon: user, color: lightblue]
+Web UI [shape: square, icon: monitor, color: blue]
+API Server [shape: square, icon: server, color: purple]
+Knowledge Graph JSON [shape: square, icon: database, color: green]
+File Storage [shape: square, icon: folder, color: yellow]
+PDF/Doc Parser [shape: square, icon: file, color: orange]
+Speech To Text [shape: square, icon: mic, color: gray]
+Text To Speech [shape: square, icon: volume-2, color: gray]
+Sarvam Query Agents [shape: square, icon: cpu, color: gray]
+
+Admin > Web UI: upload files / folders / pdf / zip
+User > Web UI: type question / upload audio / record audio
+
+Web UI > API Server: build graph / clear kb / query database
+API Server > File Storage: save uploaded source files
+API Server > PDF/Doc Parser: extract text from pdf / docx / txt / md / zip
+PDF/Doc Parser > Knowledge Graph JSON: create document / section / statement / keyword nodes
+
+API Server > Knowledge Graph JSON: read / refresh / clear
+Knowledge Graph JSON > API Server: retrieved context nodes
+
+Web UI > Speech To Text: audio via API Server
+Speech To Text > API Server: transcript
+API Server > Sarvam Query Agents: policy analyst / compliance reviewer / response writer
+Sarvam Query Agents > API Server: final multilingual answer
+API Server > Text To Speech: synthesize final answer
+Text To Speech > Web UI: playable audio response
+
+API Server > Web UI: answer / transcript / context / agent output

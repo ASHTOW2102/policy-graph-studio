@@ -1,0 +1,67 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 2136 >>
+stream
+BT
+/F1 11 Tf
+1 0 0 1 54 728 Tm (Employee Access Policy) Tj
+1 0 0 1 54 712 Tm () Tj
+1 0 0 1 54 696 Tm (# Employee and Contractor Access Policy) Tj
+1 0 0 1 54 680 Tm () Tj
+1 0 0 1 54 664 Tm (## Purpose) Tj
+1 0 0 1 54 648 Tm (This policy defines how employees, contractors, and third-party support staff may access) Tj
+1 0 0 1 54 632 Tm (internal systems and confidential company information.) Tj
+1 0 0 1 54 616 Tm () Tj
+1 0 0 1 54 600 Tm (## Approved Access Methods) Tj
+1 0 0 1 54 584 Tm (Access to internal systems is allowed only through approved company-managed devices,) Tj
+1 0 0 1 54 568 Tm (approved virtual desktop environments, or explicitly approved secure remote access services.) Tj
+1 0 0 1 54 552 Tm () Tj
+1 0 0 1 54 536 Tm (## Contractor Restrictions) Tj
+1 0 0 1 54 520 Tm (Contractors may access only the systems and documents required for their assigned work.) Tj
+1 0 0 1 54 504 Tm (Contractor access must be approved in writing by the hiring manager and the system owner) Tj
+1 0 0 1 54 488 Tm (before access is granted.) Tj
+1 0 0 1 54 472 Tm () Tj
+1 0 0 1 54 456 Tm (## Personal Device Rule) Tj
+1 0 0 1 54 440 Tm (Personal laptops, tablets, and mobile devices must not be used to access confidential policy) Tj
+1 0 0 1 54 424 Tm (documents, internal administration portals, or regulated customer data unless an explicit) Tj
+1 0 0 1 54 408 Tm (exception is approved by the Information Security team and recorded in writing.) Tj
+1 0 0 1 54 392 Tm () Tj
+1 0 0 1 54 376 Tm (## Authentication) Tj
+1 0 0 1 54 360 Tm (Multi-factor authentication is mandatory for all remote access sessions, including) Tj
+1 0 0 1 54 344 Tm (contractor access.) Tj
+1 0 0 1 54 328 Tm () Tj
+1 0 0 1 54 312 Tm (## Session Controls) Tj
+1 0 0 1 54 296 Tm (Users must not share credentials, browser sessions, or one-time passcodes. Idle remote) Tj
+1 0 0 1 54 280 Tm (sessions must time out after the approved inactivity period.) Tj
+1 0 0 1 54 264 Tm () Tj
+1 0 0 1 54 248 Tm (## Exceptions) Tj
+1 0 0 1 54 232 Tm (Any exception must include the business reason, approved duration, systems in scope, and) Tj
+1 0 0 1 54 216 Tm (compensating controls.) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 3 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+5 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000002267 00000 n 
+0000002393 00000 n 
+0000002450 00000 n 
+trailer
+<< /Size 6 /Root 5 0 R >>
+startxref
+2499
+%%EOF

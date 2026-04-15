@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Policy Graph Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="backdrop">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="orb orb-c"></div>
+    </div>
+
+    <main class="shell">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Policy Graph Studio</p>
+          <h1>Simple AI answers from your policy knowledge base.</h1>
+          <p class="hero-text">
+            Upload files on the admin side. Ask questions, upload audio, or transcribe speech on
+            the user side.
+          </p>
+        </div>
+
+        <div class="tabs" role="tablist" aria-label="App Sections">
+          <button id="adminTab" class="tab active" type="button">Admin</button>
+          <button id="userTab" class="tab" type="button">User</button>
+        </div>
+      </section>
+
+      <section id="adminScreen" class="screen active">
+        <div class="grid admin-grid">
+          <form id="adminForm" class="panel form-panel">
+            <div class="panel-head">
+              <p class="panel-kicker">Build</p>
+              <h2>Upload policy sources</h2>
+              <p class="panel-text">Add files, folders, zip archives, or absolute paths.</p>
+            </div>
+
+            <label class="field">
+              <span>Files</span>
+              <input id="fileInput" type="file" multiple />
+            </label>
+
+            <label class="field">
+              <span>Folder</span>
+              <input id="folderInput" type="file" webkitdirectory directory multiple />
+            </label>
+
+            <label class="field">
+              <span>Local paths</span>
+              <textarea
+                id="pathTargets"
+                rows="5"
+                placeholder="C:\Policies&#10;C:\Users\vmadmin\Downloads\company-policies.zip"
+              ></textarea>
+            </label>
+
+            <div class="action-row">
+              <button id="buildButton" class="button button-primary" type="submit">Build Graph</button>
+              <button id="refreshKbButton" class="button button-secondary" type="button">Refresh</button>
+              <button id="clearKbButton" class="button button-secondary" type="button">Clear KB</button>
+            </div>
+          </form>
+
+          <div class="stack">
+            <section class="panel compact-panel">
+              <div class="panel-head compact">
+                <p class="panel-kicker">Knowledge Base</p>
+                <h2>Current snapshot</h2>
+              </div>
+              <div id="kbStats" class="metric-row"></div>
+              <pre id="kbMeta" class="mono-card placeholder">No knowledge base built yet.</pre>
+            </section>
+
+            <section class="panel compact-panel">
+              <div class="panel-head compact">
+                <p class="panel-kicker">Documents</p>
+                <h2>Loaded files</h2>
+              </div>
+              <div id="documentList" class="list-grid empty-state">
+                Build the graph to see ingested documents here.
+              </div>
+            </section>
+
+            <section class="panel compact-panel">
+              <div class="panel-head compact">
+                <p class="panel-kicker">Build Log</p>
+                <h2>Latest run</h2>
+              </div>
+              <pre id="ingestLog" class="mono-card placeholder">Waiting for admin action.</pre>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="userScreen" class="screen">
+        <div class="grid user-grid">
+          <form id="queryForm" class="panel form-panel">
+            <div class="panel-head">
+              <p class="panel-kicker">Ask</p>
+              <h2>Query the policy graph</h2>
+              <p class="panel-text">Type a question or upload an audio recording for transcription.</p>
+            </div>
+
+            <label class="field">
+              <span>Question</span>
+              <textarea
+                id="question"
+                rows="6"
+                placeholder="Can a contractor access confidential policy documents from a personal laptop?"
+                required
+              ></textarea>
+            </label>
+
+            <label class="field">
+              <span>Response language</span>
+              <select id="responseLanguage">
+                <option value="Same as the user question" selected>Same as question</option>
+                <option value="English">English</option>
+                <option value="Hindi">Hindi</option>
+                <option value="Tamil">Tamil</option>
+                <option value="Telugu">Telugu</option>
+                <option value="Bengali">Bengali</option>
+                <option value="Gujarati">Gujarati</option>
+                <option value="Marathi">Marathi</option>
+              </select>
+            </label>
+
+            <section class="subpanel">
+              <div class="subpanel-head">
+                <div>
+                  <p class="subpanel-title">Speech to text</p>
+                  <p class="subpanel-text">Upload or record audio, then transcribe it.</p>
+                </div>
+                <span id="recordingBadge" class="status-chip">Idle</span>
+              </div>
+
+              <label class="field">
+                <span>Audio file</span>
+                <input id="audioUploadInput" type="file" accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg" />
+              </label>
+
+              <div class="inline-grid">
+                <label class="field">
+                  <span>Model</span>
+                  <select id="sttModel">
+                    <option value="saaras:v3" selected>saaras:v3</option>
+                    <option value="saarika:v2.5">saarika:v2.5</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span>Mode</span>
+                  <select id="sttMode">
+                    <option value="transcribe" selected>transcribe</option>
+                    <option value="translate">translate</option>
+                    <option value="verbatim">verbatim</option>
+                    <option value="translit">translit</option>
+                    <option value="codemix">codemix</option>
+                  </select>
+                </label>
+
+                <label class="field">
+                  <span>Language</span>
+                  <select id="sttLanguage">
+                    <option value="unknown" selected>Auto detect</option>
+                    <option value="en-IN">English (India)</option>
+                    <option value="hi-IN">Hindi</option>
+                    <option value="ta-IN">Tamil</option>
+                    <option value="te-IN">Telugu</option>
+                    <option value="bn-IN">Bengali</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="action-row">
+                <button id="recordButton" class="button button-secondary" type="button">Record</button>
+                <button id="stopButton" class="button button-secondary" type="button" disabled>Stop</button>
+              </div>
+
+              <audio id="recordedAudio" class="audio-player hidden" controls></audio>
+              <pre id="transcriptBox" class="mono-card placeholder">Transcript will appear here.</pre>
+            </section>
+
+            <button id="askButton" class="button button-primary wide" type="submit">Query Database</button>
+          </form>
+
+          <div class="stack">
+            <section class="panel answer-panel">
+              <div class="answer-head">
+                <div>
+                  <p class="panel-kicker">Answer</p>
+                  <h2>Final response</h2>
+                </div>
+
+                <div class="answer-tools">
+                  <select id="ttsSpeaker">
+                    <option value="shubh" selected>Shubh</option>
+                    <option value="anushka">Anushka</option>
+                    <option value="rohan">Rohan</option>
+                    <option value="priya">Priya</option>
+                    <option value="rahul">Rahul</option>
+                  </select>
+                  <select id="ttsLanguage">
+                    <option value="en-IN" selected>English</option>
+                    <option value="hi-IN">Hindi</option>
+                    <option value="ta-IN">Tamil</option>
+                    <option value="te-IN">Telugu</option>
+                    <option value="bn-IN">Bengali</option>
+                  </select>
+                  <input id="ttsPace" type="number" min="0.5" max="2" step="0.1" value="1" />
+                  <button id="speakButton" class="button button-secondary" type="button">Speak</button>
+                </div>
+              </div>
+
+              <pre id="finalAnswer" class="answer-box placeholder">Ask a question to retrieve an answer.</pre>
+              <audio id="ttsAudio" class="audio-player hidden" controls></audio>
+              <pre id="ttsStatus" class="mono-card subtle placeholder">Audio status will appear here.</pre>
+            </section>
+
+            <section class="panel compact-panel">
+              <div class="panel-head compact">
+                <p class="panel-kicker">Sources</p>
+                <h2>Relevant context</h2>
+              </div>
+              <div id="contextList" class="list-grid empty-state">Relevant graph nodes will appear here.</div>
+            </section>
+
+            <details class="panel debug-panel">
+              <summary>Agent outputs</summary>
+              <div id="agentList" class="list-grid empty-state">Agent outputs will appear here after a query.</div>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <template id="itemCardTemplate">
+      <article class="item-card">
+        <div class="item-head">
+          <p class="item-title"></p>
+          <p class="item-meta"></p>
+        </div>
+        <pre class="item-body"></pre>
+      </article>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

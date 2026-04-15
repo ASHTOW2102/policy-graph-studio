@@ -1,0 +1,57 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Length 1242 >>
+stream
+BT
+/F1 11 Tf
+1 0 0 1 54 728 Tm (Incident Response Policy) Tj
+1 0 0 1 54 712 Tm () Tj
+1 0 0 1 54 696 Tm (# Security Incident Response Policy) Tj
+1 0 0 1 54 680 Tm () Tj
+1 0 0 1 54 664 Tm (## Reporting Obligation) Tj
+1 0 0 1 54 648 Tm (Employees, contractors, and vendors must report suspected security incidents immediately to) Tj
+1 0 0 1 54 632 Tm (the Security Operations team.) Tj
+1 0 0 1 54 616 Tm () Tj
+1 0 0 1 54 600 Tm (## Lost Devices) Tj
+1 0 0 1 54 584 Tm (Any lost or stolen device that had company access must be reported within one hour of) Tj
+1 0 0 1 54 568 Tm (discovery.) Tj
+1 0 0 1 54 552 Tm () Tj
+1 0 0 1 54 536 Tm (## Containment) Tj
+1 0 0 1 54 520 Tm (Security may disable accounts, revoke sessions, block endpoints, or restrict network) Tj
+1 0 0 1 54 504 Tm (connectivity to contain risk.) Tj
+1 0 0 1 54 488 Tm () Tj
+1 0 0 1 54 472 Tm (## Evidence Preservation) Tj
+1 0 0 1 54 456 Tm (Users must not delete logs, emails, screenshots, or related files that may be required for) Tj
+1 0 0 1 54 440 Tm (investigation.) Tj
+1 0 0 1 54 424 Tm () Tj
+1 0 0 1 54 408 Tm (## Communication) Tj
+1 0 0 1 54 392 Tm (Only authorized spokespersons may communicate externally about a confirmed security) Tj
+1 0 0 1 54 376 Tm (incident.) Tj
+ET
+endstream
+endobj
+3 0 obj
+<< /Type /Page /Parent 3 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R >> >> /Contents 2 0 R >>
+endobj
+4 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+5 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000001373 00000 n 
+0000001499 00000 n 
+0000001556 00000 n 
+trailer
+<< /Size 6 /Root 5 0 R >>
+startxref
+1605
+%%EOF

@@ -1,0 +1,9 @@
+{
+  "name": "sarvam-multi-agent-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A multi-agent AI application powered by Sarvam AI chat completions.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
